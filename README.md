@@ -29,6 +29,24 @@ I also installed the `vault` CLI locally to test the issuer.
 
 Clone this repository and run `./kind-demo.sh`
 
+You should have a working demo up in less than 5 minutes.
+
+To verify, go to the sleep pod in one of the clusters and run:
+
+```bash
+istioctl pc endpoints -n sample \
+  $(kubectl get pod -n sample -l app=sleep -o jsonpath='{.items[0].metadata.name}') |\
+  grep helloworld
+```
+
+If your output contains three entries, with one of them on port `15443` the multi-cluster
+mesh with two clusters (`istio-so1` and `istio-so2`) on separate networks participating in the same mesh have been provisioned correctly.
+
+### Debugging
+
+Check that the services in the `istio-system` are in a healthy state and that metallb has
+provisioned the IPs successfully.
+
 ## When You Are Done
 
 Clean up after yourself with `./teardown.sh`
