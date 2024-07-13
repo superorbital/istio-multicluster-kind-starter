@@ -1,0 +1,37 @@
+services:
+  vault:
+    hostname: vault
+    networks:
+      - kindnet
+    container_name: vault
+    image: hashicorp/vault:1.17.2
+    environment:
+      VAULT_ADDR: "http://0.0.0.0:8200"
+      VAULT_API_ADDR: "http://0.0.0.0:8200"
+    ports:
+      - "8200:8200"
+    volumes:
+      - ./volumes/vault/file:/vault/file:rw
+    cap_add:
+      - IPC_LOCK
+    entrypoint: vault server -dev -dev-listen-address="0.0.0.0:8200" -dev-root-token-id="root"
+
+  vault-init:
+    container_name: vault-init
+    networks:
+      - kindnet
+    image: vault-init:latest
+    build:
+      context: vault-init
+      dockerfile: Dockerfile
+    volumes:
+      - ./vault-init.sh:/vault-init.sh
+      - ./certs:/certs:rw
+    depends_on:
+      - vault
+    restart: "no"
+    entrypoint: sh -c "/vault-init.sh"
+networks:
+  kindnet:
+    name: kind
+    external: true

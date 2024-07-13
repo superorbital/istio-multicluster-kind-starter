@@ -1,0 +1,6 @@
+coredns.yaml
+volumes/
+debug/
+certs/
+generated/
+testing/

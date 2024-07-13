@@ -1,0 +1,13 @@
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: vault
+  namespace: istio-system
+spec:
+  vault:
+    server: http://vault.example.com:8200
+    path: pki_int${i}/sign/cluster${i}-issuer
+    auth:
+      tokenSecretRef:
+          name: cert-manager-vault-token
+          key: token

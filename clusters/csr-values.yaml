@@ -1,0 +1,98 @@
+replicaCount: 1
+
+image:
+  repository: quay.io/jetstack/cert-manager-istio-csr
+
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+service:
+  type: ClusterIP
+  port: 443
+
+app:
+  logLevel: 1 # 1-5
+
+  metrics:
+    port: 9402
+    service:
+      enabled: true
+      type: ClusterIP
+      # The ServiceMonitor resource for this Service.
+      servicemonitor:
+        # Create Prometheus ServiceMonitor resource for approver-policy.
+        enabled: false
+        # The value for the "prometheus" label on the ServiceMonitor. This allows
+        # for multiple Prometheus instances selecting difference ServiceMonitors 
+        # using label selectors.
+        prometheusInstance: default
+        # The interval that the Prometheus will scrape for metrics.
+        interval: 10s
+        # The timeout on each metric probe request.
+        scrapeTimeout: 5s
+        # Additional labels to give the ServiceMonitor resource.
+        labels: {}
+
+  readinessProbe:
+    # Container port to expose istio-csr HTTP readiness probe on default network interface.
+    port: 6060
+    # Path to expose istio-csr HTTP readiness probe on default network interface.
+    path: "/readyz"
+
+  certmanager:
+    namespace: istio-system
+    preserveCertificateRequests: false
+    additionalAnnotations: []
+    issuer:
+      name: vault
+      kind: Issuer
+      group: cert-manager.io
+
+  tls:
+    trustDomain: "cluster.local"
+    # rootCAFile: /etc/tls/ca.crt
+    certificateDNSNames:
+    - cert-manager-istio-csr.istio-system.svc
+    certificateDuration: 1h
+    istiodAdditionalDNSNames: []
+    istiodCertificateDuration: 1h
+    istiodCertificateRenewBefore: 30m
+    istiodCertificateEnable: true
+    istiodPrivateKeySize: 2048
+
+  server:
+    # clusterID: "istio-so1" #set in command
+    maxCertificateDuration: 1h
+    serving:
+      address: 0.0.0.0
+      port: 6443
+      certificateKeySize: 2048
+      signatureAlgorithm: "RSA"
+
+  istio:
+    revisions: ["default"]
+    namespace: istio-system
+
+  controller:
+    leaderElectionNamespace: istio-system
+
+# volumes:
+#  - name: root-ca
+#    secret:
+#      secretName: root-ca
+
+# volumeMounts:
+# - name: root-ca
+#   mountPath: /etc/tls
+
+resources: {}
+
+affinity: {}
+
+tolerations: []
+
+nodeSelector:
+  kubernetes.io/os: linux
+
+commonLabels: {}
