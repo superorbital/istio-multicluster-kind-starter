@@ -3,13 +3,15 @@
 set -euv
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
+METALLB_VERSION=v0.14.5
+
 mkdir -p istio/generated
 mkdir -p clusters/generated
 both_contexts() {
   for i in {1..2}
   do
     file=$(echo $1 | sed "s/{i}/$i/")
-    k apply -f $file --context "kind-so${i}"
+    kubectl apply -f $file --context "kind-so${i}"
   done
 }
 both_contexts_command() {
@@ -28,21 +30,24 @@ in_context_func() {
   do
     export i
     kubectl config set-context kind-so$i
-    eval $1
+    $1
   done
 }
-kind create cluster --config ${SCRIPT_DIR}/clusters/config-1.yaml --name so1
-kind create cluster --config ${SCRIPT_DIR}/clusters/config-2.yaml --name so2
 
+# kind create cluster --config "${SCRIPT_DIR}/clusters/config-1.yaml" --name so1
+# kind create cluster --config "${SCRIPT_DIR}/clusters/config-2.yaml" --name so2
 
-
-both_contexts https://raw.githubusercontent.com/metallb/metallb/v0.14.5/config/manifests/metallb-native.yaml
+both_contexts https://raw.githubusercontent.com/metallb/metallb/${METALLB_VERSION}/config/manifests/metallb-native.yaml
 
 both_contexts_command "kubectl rollout status deploy -n metallb-system controller"
 
 export first_two=$(docker network inspect -f '{{$map := index .IPAM.Config 0}}{{index $map "Subnet"}}' kind | awk -F. '{for(i=1;i<=2;i++){print $i}}' | tr '\n' '.')
 
-in_context_func "envsubst < ${SCRIPT_DIR}/clusters/metallb.yaml > clusters/generated/metallb${i}.yaml"
+sub_metallb() {
+  envsubst < ${SCRIPT_DIR}/clusters/metallb.yaml > clusters/generated/metallb${i}.yaml
+}
+in_context_func sub_metallb
+
 both_contexts clusters/generated/metallb{i}.yaml
 
 (
@@ -64,7 +69,11 @@ both_contexts_command "kubectl rollout status deploy -n cert-manager cert-manage
 both_contexts_command "kubectl create ns istio-system"
 both_contexts clusters/vault-token-secret.yaml
 
-in_context_func "envsubst < ${SCRIPT_DIR}/clusters/vault-issuer.yaml > clusters/generated/vault-issuer${i}.yaml"
+sub_vault() {
+  envsubst < ${SCRIPT_DIR}/clusters/vault-issuer.yaml > clusters/generated/vault-issuer${i}.yaml
+}
+in_context_func sub_vault
+
 both_contexts clusters/generated/vault-issuer{i}.yaml
 
 both_contexts_command "helm upgrade --install -n istio-system cert-manager-istio-csr -f clusters/csr-values.yaml --set app.server.clusterID=istio-so{i} --version 0.9.0 jetstack/cert-manager-istio-csr" "kube-context"
@@ -74,19 +83,19 @@ both_contexts_command "kubectl rollout status deploy -n istio-system cert-manage
 deploy_istio() {
   echo "Starting istio deployment in cluster${i}"
 
-  kubectl get namespace istio-system && \
-    kubectl label namespace istio-system topology.istio.io/network="network${i}"
+  kubectl --context "kind-so${i}" get namespace istio-system && \
+    kubectl --context "kind-so${i}" label --overwrite namespace istio-system topology.istio.io/network="network${i}"
 
   sed -e "s/{i}/${i}/" istio/cluster.yaml > "istio/generated/cluster${i}.yaml"
-  istioctl install --force -y -f "istio/generated/cluster${i}.yaml"
+  istioctl install --context "kind-so${i}" --force -y -f "istio/generated/cluster${i}.yaml"
 
   echo "Generate eastwest gateway in cluster${i}"
   ${SCRIPT_DIR}/istio/gen-eastwest-gateway.sh \
       --mesh "mesh1" --cluster "istio-so${i}" --network "network${i}" | \
-      istioctl install -y -f -
+      istioctl --context "kind-so${i}" install -y -f -
 }
 
-in_context_func "deploy_istio"
+in_context_func deploy_istio
 
 both_contexts "istio/expose-services.yaml"
 both_contexts "istio/telemetry.yaml"
@@ -103,7 +112,7 @@ in_context_func connect_cluster
 
 apply_connect() {
   j=$((i %2 + 1))
-  kubectl apply -f istio/generated/so${j}-control-plane.yaml
+  kubectl --context "kind-so${i}" apply -f istio/generated/so${j}-control-plane.yaml
 }
 
 in_context_func apply_connect
