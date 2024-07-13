@@ -32,7 +32,7 @@ in_context_func() {
   for i in {1..2}
   do
     export i
-    kubectl config set-context kind-so$i
+    kubectl config set-context kind-so$i || true
     $1
   done
 }
@@ -40,6 +40,8 @@ in_context_func() {
 sub_cluster() {
   envsubst < ${SCRIPT_DIR}/clusters/config.yaml > clusters/generated/config-${i}.yaml
 }
+in_context_func sub_cluster
+
 kind create cluster --config "${SCRIPT_DIR}/clusters/generated/config-1.yaml" --name so1
 kind create cluster --config "${SCRIPT_DIR}/clusters/generated/config-2.yaml" --name so2
 
