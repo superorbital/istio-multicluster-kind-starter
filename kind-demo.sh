@@ -40,8 +40,8 @@ in_context_func() {
 sub_cluster() {
   envsubst < ${SCRIPT_DIR}/clusters/config.yaml > clusters/generated/config-${i}.yaml
 }
-kind create cluster --config "${SCRIPT_DIR}/clusters/config-1.yaml" --name so1
-kind create cluster --config "${SCRIPT_DIR}/clusters/config-2.yaml" --name so2
+kind create cluster --config "${SCRIPT_DIR}/clusters/generated/config-1.yaml" --name so1
+kind create cluster --config "${SCRIPT_DIR}/clusters/generated/config-2.yaml" --name so2
 
 both_contexts https://raw.githubusercontent.com/metallb/metallb/${METALLB_VERSION}/config/manifests/metallb-native.yaml
 
