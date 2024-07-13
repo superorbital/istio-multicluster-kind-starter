@@ -4,6 +4,9 @@ set -euv
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 METALLB_VERSION=v0.14.5
+export KIND_NODE_VERSION=v1.30.2
+CERT_MANAGER_VERSION=v1.15.1
+ISTIO_CSR_VERSION=0.9.0
 
 mkdir -p istio/generated
 mkdir -p clusters/generated
@@ -34,8 +37,11 @@ in_context_func() {
   done
 }
 
-# kind create cluster --config "${SCRIPT_DIR}/clusters/config-1.yaml" --name so1
-# kind create cluster --config "${SCRIPT_DIR}/clusters/config-2.yaml" --name so2
+sub_cluster() {
+  envsubst < ${SCRIPT_DIR}/clusters/config.yaml > clusters/generated/config-${i}.yaml
+}
+kind create cluster --config "${SCRIPT_DIR}/clusters/config-1.yaml" --name so1
+kind create cluster --config "${SCRIPT_DIR}/clusters/config-2.yaml" --name so2
 
 both_contexts https://raw.githubusercontent.com/metallb/metallb/${METALLB_VERSION}/config/manifests/metallb-native.yaml
 
@@ -60,7 +66,7 @@ both_contexts clusters/generated/metallb{i}.yaml
 
 both_contexts clusters/generated/coredns.yaml
 
-both_contexts https://github.com/cert-manager/cert-manager/releases/download/v1.15.1/cert-manager.yaml
+both_contexts "https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VERSION}/cert-manager.yaml"
 
 both_contexts_command "kubectl rollout status deploy -n cert-manager cert-manager-webhook"
 both_contexts_command "kubectl rollout status deploy -n cert-manager cert-manager-cainjector"
@@ -76,7 +82,7 @@ in_context_func sub_vault
 
 both_contexts clusters/generated/vault-issuer{i}.yaml
 
-both_contexts_command "helm upgrade --install -n istio-system cert-manager-istio-csr -f clusters/csr-values.yaml --set app.server.clusterID=istio-so{i} --version 0.9.0 jetstack/cert-manager-istio-csr" "kube-context"
+both_contexts_command "helm upgrade --install -n istio-system cert-manager-istio-csr -f clusters/csr-values.yaml --set app.server.clusterID=istio-so{i} --version ${ISTIO_CSR_VERSION} jetstack/cert-manager-istio-csr" "kube-context"
 
 both_contexts_command "kubectl rollout status deploy -n istio-system cert-manager-istio-csr"
 
@@ -105,7 +111,7 @@ connect_cluster() {
   istioctl create-remote-secret \
   --context="kind-so${i}" \
   --server="https://${docker_ip}:6443" \
-  --name="istio-so${i}" > istio/generated/so${i}-control-plane.yaml
+  --name="istio-so${i}" > "istio/generated/so${i}-control-plane.yaml"
 }
 
 in_context_func connect_cluster
