@@ -54,3 +54,32 @@ Clean up after yourself with `./teardown.sh`
 ## Future Goals
 
 This deployment could also be modified to support ambient multi-cluster.
+
+## Configs
+
+```
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: helloworld
+  namespace: sample
+spec:
+  host: helloworld.sample.svc.cluster.local
+  trafficPolicy:
+    connectionPool:
+      http:
+        maxRequestsPerConnection: 1
+    loadBalancer:
+      simple: ROUND_ROBIN
+      localityLbSetting:
+        enabled: true
+        failoverPriority:
+          - "topology.istio.io/network"
+          - "topology.kubernetes.io/region"
+          - "topology.kubernetes.io/zone"
+          - "kubernetes.io/hostname"
+    outlierDetection:
+      consecutive5xxErrors: 1
+      interval: 1s
+      baseEjectionTime: 1m
+```
